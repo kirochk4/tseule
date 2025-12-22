@@ -28,6 +28,10 @@ export enum Code {
     lt,
     gt,
 
+    jump,
+    jumpBack,
+    jumpIfFalse,
+
     getLocal,
     setLocal,
     getGlobal,
@@ -79,7 +83,7 @@ class Frame {
         this.vm.stack[this.slots + index] = value;
     }
 
-    public execute() {
+    public execute(): Value {
         for (;;) {
             const code = this.readByte();
             switch (code) {
@@ -105,7 +109,15 @@ class Frame {
                     this.closure.upvalues[this.readByte()].value =
                         this.vm.pop();
                     break;
-                case Code.or:
+                case Code.jump:
+                    this.pc += this.readShort();
+                    break;
+                case Code.jumpBack:
+                    this.pc -= this.readShort();
+                    break;
+                case Code.jumpIfFalse:
+                    if (!this.vm.pop().toBoolean()) this.pc += this.readShort();
+                    break;
                 case Code.add: {
                     const v2 = this.vm.peek(0);
                     const v1 = this.vm.peek(1);
@@ -218,7 +230,7 @@ export default class VirtualMachine {
         return this.stack.at(-1 - index);
     }
 
-    callMetaMethod(value: Value, methodName: MetaMethod) {
+    callMetaMethod(value: Value, methodName: MetaMethod): Value {
         let metaTable: Table;
         switch (value.type) {
             case "null":
@@ -244,23 +256,26 @@ export default class VirtualMachine {
         const method = (value.data as Table).prototype.get(
             new Value(methodName),
         );
-        this.callValue(method);
+        return this.callValue(method);
     }
 
-    private callValue(callee: Value) {
+    private callValue(callee: Value): Value {
         switch (callee.type) {
             case "function":
-                this.callFunction(callee);
-                break;
+                return this.callFunction(callee);
             default:
-                this.callMetaMethod(callee, MetaMethod.call);
+                return this.callMetaMethod(callee, MetaMethod.call);
         }
     }
 
-    private callFunction(callee: Value) {
-        if (typeof callee.data === "function") {
-            
-        }
+    private callFunction(callee: Value): Value {
+        if (typeof callee.data === "function") return callee.data(this);
+        else
+            return new Frame(
+                callee.data as Closure,
+                this.stack.length,
+                this,
+            ).execute();
     }
 }
 
