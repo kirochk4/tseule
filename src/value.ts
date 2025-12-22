@@ -94,10 +94,6 @@ class Upvalue {
 export class Closure {
     public readonly upvalues: Upvalue[];
     constructor(public readonly fragment: Fragment) {}
-
-    call(_vm: VirtualMachine): Value {
-        return new Value();
-    }
 }
 
 export type Native = (vm: VirtualMachine) => Value;
@@ -117,7 +113,7 @@ export class Table {
     }
 
     public set(key: Value, value: Value) {
-        if (key === undefined) throw new RuntimeError("table index is nil");
+        if (key === undefined) throw new RuntimeError("table index is null");
         if (value === undefined) this.pairs.delete(key.toString());
         else this.pairs.set(value.toString(), value);
     }

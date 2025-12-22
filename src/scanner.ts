@@ -37,7 +37,7 @@ export default class Scanner {
 
             if (char == codeQuot) return this.string();
 
-            let trio;
+            let trio: TokenType;
             if (
                 (trio = triple.get(
                     String.fromCodePoint(char, this.current, this.peek),
@@ -48,13 +48,13 @@ export default class Scanner {
                 return this.makeToken(trio);
             }
 
-            let duo;
+            let duo: TokenType;
             if ((duo = dual.get(String.fromCodePoint(char, this.current)))) {
                 this.advance();
                 return this.makeToken(duo);
             }
 
-            let solo;
+            let solo: TokenType;
             if ((solo = mono.get(String.fromCodePoint(char))))
                 return this.makeToken(solo);
 

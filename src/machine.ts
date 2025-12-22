@@ -1,9 +1,25 @@
-import Fragment, { Constant } from "./fragment.ts";
+import Compiler from "./compiler.ts";
+import Scanner from "./scanner.ts";
 import { Closure, Table, Value } from "./value.ts";
 
 export enum Code {
-    pop,
-    close,
+    move,
+    load,
+    loadBool,
+    loadNull,
+
+    getGlobal,
+    getTable,
+    safeGetTable,
+    getUpValue,
+    setGlobal,
+    setTable,
+    setUpValue,
+
+    newTable,
+
+    call,
+    return,
 
     add,
     sub,
@@ -13,32 +29,28 @@ export enum Code {
     idv,
     mod,
 
-    neg,
-    pos,
-
     and,
     or,
     xor,
-    lsh,
-    rsh,
-    inv,
 
+    rev,
+    unm,
+    unp,
     not,
+
     eq,
     lt,
     gt,
 
     jump,
-    jumpBack,
-    jumpIfFalse,
 
-    getLocal,
-    setLocal,
-    getGlobal,
-    setGlobal,
-    getUpvalue,
-    setUpvalue,
+    closure,
+    close,
+
+    vararg,
 }
+
+const isReg = 1;
 
 class Frame {
     private pc: number = 0;
@@ -49,164 +61,102 @@ class Frame {
         private readonly vm: VirtualMachine,
     ) {}
 
-    private readByte(): number {
-        return this.closure.fragment.code[this.pc++]!;
+    private get code(): number {
+        return this.closure.fragment.code[this.pc]!;
     }
 
-    private readShort(): number {
-        const big = this.readByte();
-        const small = this.readByte();
-        return (big << 8) | small;
+    private get a(): number {
+        return this.closure.fragment.code[this.pc + 1]!;
     }
 
-    private readConstant(): Constant {
-        return this.closure.fragment.constants[this.readByte()];
+    private get b(): number {
+        return this.closure.fragment.code[this.pc + 2]!;
     }
 
-    private readValue(): Value {
-        return new Value(this.readConstant() as string | number);
+    private get bValue(): Value {
+        if (this.b >> 8 === isReg)
+            return this.vm.regs[this.slots + this.b && 0xff]!;
+        return new Value(
+            this.closure.fragment.constants[this.b && 0xff] as number | string,
+        );
     }
 
-    private readString(): string {
-        return this.readConstant() as string;
+    private get c(): number {
+        return this.closure.fragment.code[this.pc + 2]!;
     }
 
-    private readFragment(): Fragment {
-        return this.readConstant() as Fragment;
+    private get cValue(): Value {
+        if (this.c >> 8 === isReg)
+            return this.vm.regs[this.slots + this.c && 0xff]!;
+        return new Value(
+            this.closure.fragment.constants[this.c && 0xff] as number | string,
+        );
     }
 
-    private getLocal(index: number): Value {
-        return this.vm.stack[this.slots + index];
-    }
-
-    private setLocal(index: number, value: Value) {
-        this.vm.stack[this.slots + index] = value;
+    private step() {
+        this.pc += 4;
     }
 
     public execute(): Value {
-        for (;;) {
-            const code = this.readByte();
-            switch (code) {
-                case Code.pop:
-                    this.vm.pop();
-                    break;
-                case Code.getLocal:
-                    this.vm.push(this.getLocal(this.readByte()));
-                    break;
-                case Code.setLocal:
-                    this.setLocal(this.readByte(), this.vm.pop());
-                    break;
-                case Code.getGlobal:
-                    this.vm.push(this.vm.global.get(this.readValue()));
-                    break;
-                case Code.setGlobal:
-                    this.vm.global.set(this.readValue(), this.vm.pop());
-                    break;
-                case Code.getUpvalue:
-                    this.vm.push(this.closure.upvalues[this.readByte()].value);
-                    break;
-                case Code.setUpvalue:
-                    this.closure.upvalues[this.readByte()].value =
-                        this.vm.pop();
-                    break;
-                case Code.jump:
-                    this.pc += this.readShort();
-                    break;
-                case Code.jumpBack:
-                    this.pc -= this.readShort();
-                    break;
-                case Code.jumpIfFalse:
-                    if (!this.vm.pop().toBoolean()) this.pc += this.readShort();
-                    break;
-                case Code.add: {
-                    const v2 = this.vm.peek(0);
-                    const v1 = this.vm.peek(1);
-                    if (v1.type === "string" && v2.type === "string") {
-                        this.vm.push(
-                            new Value(
-                                (v1.data as string) + (v2.data as string),
-                            ),
-                        );
-                        break;
-                    }
-                }
-                /* falls through */
-                case Code.sub:
-                case Code.mul:
-                case Code.div:
-                case Code.mod:
-                case Code.idv: {
-                    const v2 = this.vm.pop();
-                    const v1 = this.vm.pop();
-                    if (v1.type === "number" && v2.type === "number") {
-                        const op = numOps.get(code)!;
-                        this.vm.push(op(v1.data as number, v2.data as number));
-                        break;
-                    }
-                    throw new RuntimeError(
-                        `attempt to ${opNames.get(code)} a '${
-                            v1.type
-                        }' with a '${v2.type}'`,
-                    );
-                }
-            }
-        }
+        for (;;) {}
     }
-}
-
-enum MetaMethod {
-    call = "__call",
-
-    add = "__add",
-    sub = "__sub",
-    mul = "__mul",
-    pow = "__pow",
-    div = "__div",
-    idv = "__idv",
-    mod = "__mod",
-
-    neg = "__neg",
-    pos = "__pos",
-
-    and = "__and",
-    or = "__or",
-    xor = "__xor",
-    lsh = "__lsh",
-    rsh = "__rsh",
-    inv = "__inv",
-
-    not = "__not",
-    eq = "__eq",
-    lt = "__lt",
-    gt = "__gt",
-
-    index = "__index",
-    newIndex = "__new_index",
 }
 
 const idv = (a: number, b: number): number => Math.floor(a / b);
 
-const numOps = new Map([
+const numBinOps = new Map([
     [Code.add, (v1: number, v2: number): Value => new Value(v1 + v2)],
     [Code.sub, (v1: number, v2: number): Value => new Value(v1 - v2)],
     [Code.mul, (v1: number, v2: number): Value => new Value(v1 * v2)],
+    [Code.pow, (v1: number, v2: number): Value => new Value(v1 ** v2)],
     [Code.div, (v1: number, v2: number): Value => new Value(v1 / v2)],
-    [Code.mod, (v1: number, v2: number): Value => new Value(v1 % v2)],
     [Code.idv, (v1: number, v2: number): Value => new Value(idv(v1, v2))],
+    [Code.mod, (v1: number, v2: number): Value => new Value(v1 % v2)],
+
+    [Code.and, (v1: number, v2: number): Value => new Value(v1 & v2)],
+    [Code.or, (v1: number, v2: number): Value => new Value(v1 | v2)],
+    [Code.xor, (v1: number, v2: number): Value => new Value(v1 ^ v2)],
+
+    [Code.lt, (v1: number, v2: number): Value => new Value(v1 < v2)],
+    [Code.gt, (v1: number, v2: number): Value => new Value(v1 > v2)],
+]);
+
+const numUnOps = new Map([
+    [Code.unm, (v1: number): Value => new Value(-v1)],
+    [Code.unp, (v1: number): Value => new Value(+v1)],
+    [Code.rev, (v1: number): Value => new Value(~v1)],
 ]);
 
 const opNames = new Map([
     [Code.add, "add"],
     [Code.sub, "sub"],
     [Code.mul, "mul"],
+    [Code.pow, "pow"],
     [Code.div, "div"],
-    [Code.mod, "mod"],
     [Code.idv, "idv"],
+    [Code.mod, "mod"],
+
+    [Code.and, "and"],
+    [Code.or, "or"],
+    [Code.xor, "xor"],
+
+    [Code.rev, "rev"],
+    [Code.unm, "unm"],
+    [Code.unp, "unp"],
+
+    [Code.not, "not"],
+    [Code.eq, "eq"],
+    [Code.lt, "lt"],
+    [Code.gt, "gt"],
 ]);
 
+const stackMax = 0x40;
+const regsMax = stackMax * (0xff - 1);
+
 export default class VirtualMachine {
-    public readonly stack: Value[] = new Array();
+    public readonly regs: Value[] = new Array(regsMax).fill(new Value());
     public readonly global: Table = new Table();
+    private readonly callStack: Frame[] = new Array();
     private readonly tables = {
         boolean: new Table(),
         number: new Table(),
@@ -214,68 +164,36 @@ export default class VirtualMachine {
         function: new Table(),
     };
 
-    constructor() {}
+    constructor(args: string[]) {
+        this.global.set(new Value("__global"), new Value(this.global));
 
-    run() {}
-
-    push(value: Value) {
-        this.stack.push(value);
+        const argsTable = new Table();
+        for (let i = 0; i < args.length; i++)
+            argsTable.set(new Value(i), new Value(args[i]));
+        this.global.set(new Value("__args"), new Value(argsTable));
     }
 
-    pop(): Value {
-        return this.stack.pop();
+    public run(source: string) {
+        const scanner = new Scanner(source);
+        const compiler = new Compiler(scanner);
+        const fragment = compiler.compile();
+        const closure = new Closure(fragment);
+
+        this.regs[0] = new Value();
+        this.call(new Value(closure), 0);
     }
 
-    peek(index: number): Value {
-        return this.stack.at(-1 - index);
-    }
-
-    callMetaMethod(value: Value, methodName: MetaMethod): Value {
-        let metaTable: Table;
-        switch (value.type) {
-            case "null":
-                throw new RuntimeError(
-                    `'null' have no metatable to call ${methodName}`,
-                );
-            case "boolean":
-                metaTable = this.tables.boolean;
-            case "number":
-                metaTable = this.tables.number;
-            case "string":
-                metaTable = this.tables.string;
-            case "table":
-                if ((value.data as Table).prototype === undefined)
-                    throw new RuntimeError(
-                        `'table' have no metatable to call ${methodName}`,
-                    );
-                metaTable = (value.data as Table).prototype;
-
-            case "function":
-                metaTable = this.tables.function;
-        }
-        const method = (value.data as Table).prototype.get(
-            new Value(methodName),
-        );
-        return this.callValue(method);
-    }
-
-    private callValue(callee: Value): Value {
-        switch (callee.type) {
-            case "function":
-                return this.callFunction(callee);
-            default:
-                return this.callMetaMethod(callee, MetaMethod.call);
-        }
-    }
-
-    private callFunction(callee: Value): Value {
+    private call(callee: Value, slot: number): Value {
+        if (callee.type !== "function")
+            throw new RuntimeError(`cannot call '${callee.type}'`);
         if (typeof callee.data === "function") return callee.data(this);
-        else
-            return new Frame(
-                callee.data as Closure,
-                this.stack.length,
-                this,
-            ).execute();
+        const frame = new Frame(callee.data as Closure, slot, this);
+        if (this.callStack.length == stackMax)
+            throw new RuntimeError("stack owerflow");
+        this.callStack.push(frame);
+        const value = frame.execute();
+        this.callStack.pop();
+        return value;
     }
 }
 
