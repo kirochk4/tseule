@@ -9,69 +9,96 @@ type ValueType =
     | "function"
     | "table";
 
-export class Value {
-    constructor(
-        public readonly data?:
-            | boolean
-            | number
-            | string
-            | Closure
-            | Native
-            | Table,
-    ) {}
+export default class Value {
+    constructor(public readonly type: ValueType) {}
 
-    public get type(): ValueType {
-        switch (typeof this.data) {
-            case "undefined":
-                return "null";
-            case "boolean":
-                return "boolean";
-            case "number":
-                return "number";
-            case "string":
-                return "string";
-            case "function":
-                return "function";
-            case "object":
-                if (this.data instanceof Table) return "table";
-                if (this.data instanceof Closure) return "function";
-        }
-        throw new Error("unreachable!");
+    public toBoolean(): boolean {
+        return true;
     }
 
     public toString(): string {
-        switch (typeof this.data) {
-            case "undefined":
-                return "null";
-            case "boolean":
-                return this.data ? "true" : "false";
-            case "number":
-                return this.data.toString();
-            case "string":
-                return this.data;
-            case "function":
-                return "[function]";
-            case "object":
-                if (this.data instanceof Table) return "[table]";
-                if (this.data instanceof Closure) return "[function]";
-        }
-        throw new Error("unreachable!");
-    }
-
-    public toBoolean(): boolean {
-        switch (typeof this.data) {
-            case "boolean":
-                return this.data;
-            case "undefined":
-                return false;
-        }
-        return true;
+        return "<value>";
     }
 }
 
-class Upvalue {
+export class Null extends Value {
+    constructor() {
+        super("null");
+    }
+
+    public toString(): string {
+        return "null";
+    }
+
+    public toBoolean(): boolean {
+        return false;
+    }
+}
+
+export class Boolean extends Value {
+    constructor(private readonly data: boolean) {
+        super("boolean");
+    }
+
+    public toString(): string {
+        return this.data ? "true" : "false";
+    }
+
+    public toBoolean(): boolean {
+        return this.data;
+    }
+}
+
+export class Number extends Value {
+    constructor(private readonly data: number) {
+        super("number");
+    }
+
+    public toString(): string {
+        return this.data.toString();
+    }
+}
+
+export class String extends Value {
+    constructor(private readonly data: string) {
+        super("string");
+    }
+
+    public toString(): string {
+        return this.data;
+    }
+}
+
+export class Table extends Value {
+    private readonly pairs: Map<string, Value> = new Map();
+
+    constructor(public prototype: Table | undefined = undefined) {
+        super("table");
+    }
+
+    public toString(): string {
+        return "<table>";
+    }
+
+    public get(key: Value): Value {
+        if (key.type === "null") return new Null();
+        else
+            return (
+                this.pairs.get(key.toString()) ||
+                (this.prototype ? this.prototype.get(key) : new Null())
+            );
+    }
+
+    public set(key: Value, value: Value) {
+        if (key.type === "null") throw new RuntimeError("table index is null");
+        if (value.type === "null") this.pairs.delete(key.toString());
+        else this.pairs.set(value.toString(), value);
+    }
+}
+
+class UpValue {
     private closed?: Value;
-    public next?: Upvalue;
+    public next?: UpValue;
 
     constructor(private location: number, private readonly where: Value[]) {}
 
@@ -91,30 +118,24 @@ class Upvalue {
     }
 }
 
-export class Closure {
-    public readonly upvalues: Upvalue[];
-    constructor(public readonly fragment: Fragment) {}
-}
+export class Closure extends Value {
+    public readonly upvalues: UpValue[];
 
-export type Native = (vm: VirtualMachine) => Value;
-
-export class Table {
-    private readonly pairs: Map<string, Value> = new Map();
-
-    constructor(public prototype: Table | undefined = undefined) {}
-
-    public get(key: Value): Value {
-        if (key === undefined) return new Value();
-        else
-            return (
-                this.pairs.get(key.toString()) ||
-                (this.prototype ? this.prototype.get(key) : new Value())
-            );
+    constructor(public readonly fragment: Fragment) {
+        super("function");
     }
 
-    public set(key: Value, value: Value) {
-        if (key === undefined) throw new RuntimeError("table index is null");
-        if (value === undefined) this.pairs.delete(key.toString());
-        else this.pairs.set(value.toString(), value);
+    public toString(): string {
+        return "<function>";
+    }
+}
+
+export class Native extends Value {
+    constructor(public readonly data: (vm: VirtualMachine) => Value) {
+        super("function");
+    }
+
+    public toString(): string {
+        return "<function>";
     }
 }

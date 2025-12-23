@@ -1,6 +1,14 @@
 import Compiler from "./compiler.ts";
 import Scanner from "./scanner.ts";
-import { Closure, Table, Value } from "./value.ts";
+import Value, {
+    Boolean,
+    Closure,
+    Native,
+    Null,
+    Number,
+    String,
+    Table,
+} from "./value.ts";
 
 export enum Code {
     move,
@@ -76,9 +84,10 @@ class Frame {
     private get bValue(): Value {
         if (this.b >> 8 === isReg)
             return this.vm.regs[this.slots + this.b && 0xff]!;
-        return new Value(
-            this.closure.fragment.constants[this.b && 0xff] as number | string,
-        );
+        const constant = this.closure.fragment.constants[this.b && 0xff];
+        if (typeof constant == "number") return new Number(constant);
+        if (typeof constant == "string") return new String(constant);
+        throw new Error("unreachable!");
     }
 
     private get c(): number {
@@ -88,9 +97,10 @@ class Frame {
     private get cValue(): Value {
         if (this.c >> 8 === isReg)
             return this.vm.regs[this.slots + this.c && 0xff]!;
-        return new Value(
-            this.closure.fragment.constants[this.c && 0xff] as number | string,
-        );
+        const constant = this.closure.fragment.constants[this.c && 0xff];
+        if (typeof constant == "number") return new Number(constant);
+        if (typeof constant == "string") return new String(constant);
+        throw new Error("unreachable!");
     }
 
     private step() {
@@ -105,26 +115,26 @@ class Frame {
 const idv = (a: number, b: number): number => Math.floor(a / b);
 
 const numBinOps = new Map([
-    [Code.add, (v1: number, v2: number): Value => new Value(v1 + v2)],
-    [Code.sub, (v1: number, v2: number): Value => new Value(v1 - v2)],
-    [Code.mul, (v1: number, v2: number): Value => new Value(v1 * v2)],
-    [Code.pow, (v1: number, v2: number): Value => new Value(v1 ** v2)],
-    [Code.div, (v1: number, v2: number): Value => new Value(v1 / v2)],
-    [Code.idv, (v1: number, v2: number): Value => new Value(idv(v1, v2))],
-    [Code.mod, (v1: number, v2: number): Value => new Value(v1 % v2)],
+    [Code.add, (v1: number, v2: number): Value => new Number(v1 + v2)],
+    [Code.sub, (v1: number, v2: number): Value => new Number(v1 - v2)],
+    [Code.mul, (v1: number, v2: number): Value => new Number(v1 * v2)],
+    [Code.pow, (v1: number, v2: number): Value => new Number(v1 ** v2)],
+    [Code.div, (v1: number, v2: number): Value => new Number(v1 / v2)],
+    [Code.idv, (v1: number, v2: number): Value => new Number(idv(v1, v2))],
+    [Code.mod, (v1: number, v2: number): Value => new Number(v1 % v2)],
 
-    [Code.and, (v1: number, v2: number): Value => new Value(v1 & v2)],
-    [Code.or, (v1: number, v2: number): Value => new Value(v1 | v2)],
-    [Code.xor, (v1: number, v2: number): Value => new Value(v1 ^ v2)],
+    [Code.and, (v1: number, v2: number): Value => new Number(v1 & v2)],
+    [Code.or, (v1: number, v2: number): Value => new Number(v1 | v2)],
+    [Code.xor, (v1: number, v2: number): Value => new Number(v1 ^ v2)],
 
-    [Code.lt, (v1: number, v2: number): Value => new Value(v1 < v2)],
-    [Code.gt, (v1: number, v2: number): Value => new Value(v1 > v2)],
+    [Code.lt, (v1: number, v2: number): Value => new Boolean(v1 < v2)],
+    [Code.gt, (v1: number, v2: number): Value => new Boolean(v1 > v2)],
 ]);
 
 const numUnOps = new Map([
-    [Code.unm, (v1: number): Value => new Value(-v1)],
-    [Code.unp, (v1: number): Value => new Value(+v1)],
-    [Code.rev, (v1: number): Value => new Value(~v1)],
+    [Code.unm, (v1: number): Value => new Number(-v1)],
+    [Code.unp, (v1: number): Value => new Number(+v1)],
+    [Code.rev, (v1: number): Value => new Number(~v1)],
 ]);
 
 const opNames = new Map([
@@ -154,7 +164,7 @@ const stackMax = 0x40;
 const regsMax = stackMax * (0xff - 1);
 
 export default class VirtualMachine {
-    public readonly regs: Value[] = new Array(regsMax).fill(new Value());
+    public readonly regs: Value[] = new Array(regsMax).fill(new Null());
     public readonly global: Table = new Table();
     private readonly callStack: Frame[] = new Array();
     private readonly tables = {
@@ -165,12 +175,12 @@ export default class VirtualMachine {
     };
 
     constructor(args: string[]) {
-        this.global.set(new Value("__global"), new Value(this.global));
+        this.global.set(new String("__global"), this.global);
 
         const argsTable = new Table();
         for (let i = 0; i < args.length; i++)
-            argsTable.set(new Value(i), new Value(args[i]));
-        this.global.set(new Value("__args"), new Value(argsTable));
+            argsTable.set(new Number(i), new String(args[i]));
+        this.global.set(new String("__args"), argsTable);
     }
 
     public run(source: string) {
@@ -179,17 +189,20 @@ export default class VirtualMachine {
         const fragment = compiler.compile();
         const closure = new Closure(fragment);
 
-        this.regs[0] = new Value();
-        this.call(new Value(closure), 0);
+        this.regs[0] = new Null(); // this
+        this.call(closure, 0);
     }
 
     private call(callee: Value, slot: number): Value {
         if (callee.type !== "function")
             throw new RuntimeError(`cannot call '${callee.type}'`);
-        if (typeof callee.data === "function") return callee.data(this);
-        const frame = new Frame(callee.data as Closure, slot, this);
+
+        if (callee instanceof Native) return callee.data(this);
+
         if (this.callStack.length == stackMax)
             throw new RuntimeError("stack owerflow");
+
+        const frame = new Frame(callee as Closure, slot, this);
         this.callStack.push(frame);
         const value = frame.execute();
         this.callStack.pop();
