@@ -9,4 +9,11 @@ export default class Compiler {
     public compile(): Fragment {
         return this.fragment;
     }
+
+    private advance() {}
+    private errorAt() {}
+    private match() {}
+    private consume() {}
+    private consumeSemi() {}
+    private skipNewLine() {}
 }

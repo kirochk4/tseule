@@ -1,18 +1,18 @@
-export function code(symbol: string): number {
+export function codeOf(symbol: string): number {
     const code = symbol.codePointAt(0);
     if (code === undefined) throw new Error("TODO");
     return code;
 }
 
-export function slice(str: string, start: number, end: number): string {
+export function sliceFrom(str: string, start: number, end: number): string {
     return [...str].slice(start, end).join("");
 }
 
-export function length(str: string): number {
+export function lengthOf(str: string): number {
     return [...str].length;
 }
 
-export function short(
+export function shortString(
     str: string,
     length: number,
     cutNewLine: boolean = false,
@@ -35,10 +35,14 @@ export function short(
     return cut(length);
 }
 
-export function cover(str: string, width?: number, char: string = " "): string {
-    if (width === undefined) width = length(str) + 2;
-    if (length(str) > width) str = short(str, width);
-    const left = (width - length(str)) / 2;
-    const right = left + (length(str) % 2);
+export function coverString(
+    str: string,
+    width?: number,
+    char: string = " ",
+): string {
+    if (width === undefined) width = lengthOf(str) + 2;
+    if (lengthOf(str) > width) str = shortString(str, width);
+    const left = (width - lengthOf(str)) / 2;
+    const right = left + (lengthOf(str) % 2);
     return `${char.repeat(left)}${str}${char.repeat(right)}`;
 }

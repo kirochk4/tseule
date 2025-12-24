@@ -3,6 +3,8 @@ import Scanner from "./scanner.ts";
 import Value, {
     Boolean,
     Closure,
+    Float,
+    Integer,
     Native,
     Null,
     Number,
@@ -85,7 +87,8 @@ class Frame {
         if (this.b >> 8 === isReg)
             return this.vm.regs[this.slots + this.b && 0xff]!;
         const constant = this.closure.fragment.constants[this.b && 0xff];
-        if (typeof constant == "number") return new Number(constant);
+        if (typeof constant == "number") return new Float(constant);
+        if (typeof constant == "bigint") return new Integer(constant);
         if (typeof constant == "string") return new String(constant);
         throw new Error("unreachable!");
     }
@@ -98,7 +101,8 @@ class Frame {
         if (this.c >> 8 === isReg)
             return this.vm.regs[this.slots + this.c && 0xff]!;
         const constant = this.closure.fragment.constants[this.c && 0xff];
-        if (typeof constant == "number") return new Number(constant);
+        if (typeof constant == "number") return new Float(constant);
+        if (typeof constant == "bigint") return new Integer(constant);
         if (typeof constant == "string") return new String(constant);
         throw new Error("unreachable!");
     }
@@ -112,29 +116,27 @@ class Frame {
     }
 }
 
-const idv = (a: number, b: number): number => Math.floor(a / b);
-
 const numBinOps = new Map([
-    [Code.add, (v1: number, v2: number): Value => new Number(v1 + v2)],
-    [Code.sub, (v1: number, v2: number): Value => new Number(v1 - v2)],
-    [Code.mul, (v1: number, v2: number): Value => new Number(v1 * v2)],
-    [Code.pow, (v1: number, v2: number): Value => new Number(v1 ** v2)],
-    [Code.div, (v1: number, v2: number): Value => new Number(v1 / v2)],
-    [Code.idv, (v1: number, v2: number): Value => new Number(idv(v1, v2))],
-    [Code.mod, (v1: number, v2: number): Value => new Number(v1 % v2)],
+    [Code.add, (v1: Number, v2: Number): Value => v1.add(v2)],
+    [Code.sub, (v1: Number, v2: Number): Value => v1.sub(v2)],
+    [Code.mul, (v1: Number, v2: Number): Value => v1.mul(v2)],
+    [Code.pow, (v1: Number, v2: Number): Value => v1.pow(v2)],
+    [Code.div, (v1: Number, v2: Number): Value => v1.div(v2)],
+    [Code.idv, (v1: Number, v2: Number): Value => v1.idv(v2)],
+    [Code.mod, (v1: Number, v2: Number): Value => v1.mod(v2)],
 
-    [Code.and, (v1: number, v2: number): Value => new Number(v1 & v2)],
-    [Code.or, (v1: number, v2: number): Value => new Number(v1 | v2)],
-    [Code.xor, (v1: number, v2: number): Value => new Number(v1 ^ v2)],
+    [Code.and, (v1: Number, v2: Number): Value => v1.and(v2)],
+    [Code.or, (v1: Number, v2: Number): Value => v1.or(v2)],
+    [Code.xor, (v1: Number, v2: Number): Value => v1.xor(v2)],
 
-    [Code.lt, (v1: number, v2: number): Value => new Boolean(v1 < v2)],
-    [Code.gt, (v1: number, v2: number): Value => new Boolean(v1 > v2)],
+    [Code.lt, (v1: Number, v2: Number): Value => v1.lt(v2)],
+    [Code.gt, (v1: Number, v2: Number): Value => v1.gt(v2)],
 ]);
 
 const numUnOps = new Map([
-    [Code.unm, (v1: number): Value => new Number(-v1)],
-    [Code.unp, (v1: number): Value => new Number(+v1)],
-    [Code.rev, (v1: number): Value => new Number(~v1)],
+    [Code.unm, (v1: Number): Value => v1.unm()],
+    [Code.unp, (v1: Number): Value => v1.unp()],
+    [Code.rev, (v1: Number): Value => v1.rev()],
 ]);
 
 const opNames = new Map([
@@ -179,7 +181,7 @@ export default class VirtualMachine {
 
         const argsTable = new Table();
         for (let i = 0; i < args.length; i++)
-            argsTable.set(new Number(i), new String(args[i]));
+            argsTable.set(new Float(i), new String(args[i]));
         this.global.set(new String("__args"), argsTable);
     }
 

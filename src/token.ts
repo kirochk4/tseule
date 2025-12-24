@@ -1,4 +1,4 @@
-import { cover, short } from "./lib.ts";
+import { coverString, shortString } from "./lib.ts";
 
 export class Token {
     constructor(
@@ -8,8 +8,8 @@ export class Token {
     ) {}
 
     public toString(): string {
-        return `[ token ${this.type.padEnd(10)} |${cover(
-            short(this.literal, 8, true),
+        return `[ token ${this.type.padEnd(10)} |${coverString(
+            shortString(this.literal, 8, true),
             10,
         )}| at line ${this.line} ]`;
     }
@@ -20,12 +20,15 @@ export enum TokenType {
     true = "true",
     false = "false",
 
-    number = "number",
+    integer = "integer",
+    float = "float",
     string = "string",
     identifier = "identifier",
 
     variable = "variable",
-    function = "function",
+    constant = "constant",
+    syncFunction = "sync function",
+    asyncFunction = "async function",
 
     if = "if",
     else = "else",
@@ -44,6 +47,7 @@ export enum TokenType {
     switch = "switch",
     case = "case",
     default = "default",
+    await = "await",
 
     typeof = "typeof",
 
@@ -75,6 +79,7 @@ export enum TokenType {
     circum = "^",
     tilde = "~",
 
+    arrow = "=>",
     questDot = "?.",
     questLeftBracket = "?[",
     equalEqual = "==",
@@ -98,6 +103,8 @@ export enum TokenType {
     amperAmper = "&&",
 
     dotDotDot = "...",
+    tildeSlashEqual = "~/=",
+    starStarEqual = "**=",
 
     newLine = "new line",
 

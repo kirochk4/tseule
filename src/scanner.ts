@@ -1,4 +1,4 @@
-import { code, length, slice } from "./lib.ts";
+import { codeOf, lengthOf, sliceFrom } from "./lib.ts";
 import { Token, TokenType } from "./token.ts";
 
 export default class Scanner {
@@ -168,12 +168,24 @@ export default class Scanner {
 
         readDigits(true);
 
-        if (base === 10 && this.current == codeDot && isDigit(this.peek)) {
+        let hasDot = false;
+        if (base === 10 && this.current === codeDot) {
+            hasDot = true;
             this.advance();
+            if (isAlpha(this.current)) this.throwErrorToken("malformed number");
             readDigits(false);
+        } else if (
+            base === 10 &&
+            (this.current === codeOf("f") || this.current === codeOf("F"))
+        ) {
+            hasDot = true;
+            this.advance();
         }
 
-        return this.makeToken(TokenType.number);
+        const type =
+            base === 10 && hasDot ? TokenType.integer : TokenType.float;
+
+        return this.makeToken(type);
     }
 
     private get isAtEnd(): boolean {
@@ -181,28 +193,28 @@ export default class Scanner {
     }
 
     private get current(): number {
-        if (this.sourceCounter >= length(this.source)) return eof;
-        return code(this.source[this.sourceCounter]!);
+        if (this.sourceCounter >= lengthOf(this.source)) return eof;
+        return codeOf(this.source[this.sourceCounter]!);
     }
 
     private get peek(): number {
-        if (this.sourceCounter + 1 >= length(this.source)) return eof;
-        return code(this.source[this.sourceCounter + 1]!);
+        if (this.sourceCounter + 1 >= lengthOf(this.source)) return eof;
+        return codeOf(this.source[this.sourceCounter + 1]!);
     }
 
     private get literal(): string {
-        return slice(this.source, this.start, this.sourceCounter);
+        return sliceFrom(this.source, this.start, this.sourceCounter);
     }
 }
 
 const numberBase = new Map([
-    [code("x"), 16],
-    [code("o"), 8],
-    [code("b"), 2],
+    [codeOf("x"), 16],
+    [codeOf("o"), 8],
+    [codeOf("b"), 2],
 
-    [code("X"), 16],
-    [code("O"), 8],
-    [code("B"), 2],
+    [codeOf("X"), 16],
+    [codeOf("O"), 8],
+    [codeOf("B"), 2],
 ]);
 
 const mono = new Map<string, TokenType>([
@@ -237,6 +249,7 @@ const dual = new Map<string, TokenType>([
     ["<<", TokenType.leftAngleAngle],
     [">>", TokenType.rightAngleAngle],
 
+    ["=>", TokenType.arrow],
     ["?.", TokenType.questDot],
     ["?[", TokenType.questLeftBracket],
     ["==", TokenType.equalEqual],
@@ -255,12 +268,16 @@ const dual = new Map<string, TokenType>([
     ["^=", TokenType.circumEqual],
     ["~=", TokenType.tildeEqual],
     ["**", TokenType.starStar],
-    ["~/", TokenType.tildeSlash],
+    ["**", TokenType.starStar],
     ["||", TokenType.pipePipe],
     ["&&", TokenType.amperAmper],
 ]);
 
-const triple = new Map<string, TokenType>([["...", TokenType.dotDotDot]]);
+const triple = new Map<string, TokenType>([
+    ["...", TokenType.dotDotDot],
+    ["**=", TokenType.starStarEqual],
+    ["~/=", TokenType.tildeSlashEqual],
+]);
 
 const keywords = new Map<string, TokenType>([
     ["null", TokenType.null],
@@ -268,7 +285,9 @@ const keywords = new Map<string, TokenType>([
     ["false", TokenType.false],
 
     ["let", TokenType.variable],
-    ["function", TokenType.function],
+    ["final", TokenType.constant],
+    ["sync", TokenType.syncFunction],
+    ["async", TokenType.asyncFunction],
 
     ["if", TokenType.if],
     ["else", TokenType.else],
@@ -287,6 +306,7 @@ const keywords = new Map<string, TokenType>([
     ["switch", TokenType.switch],
     ["case", TokenType.case],
     ["default", TokenType.default],
+    ["await", TokenType.await],
 
     ["typeof", TokenType.typeof],
 ]);
@@ -295,7 +315,8 @@ const allowNewLineAfter = new Set<TokenType>([
     TokenType.null,
     TokenType.true,
     TokenType.false,
-    TokenType.number,
+    TokenType.integer,
+    TokenType.float,
     TokenType.string,
     TokenType.identifier,
     TokenType.return,
@@ -310,33 +331,33 @@ const allowNewLineAfter = new Set<TokenType>([
 
 const eof = -1;
 
-const code0 = code("0");
-const code9 = code("9");
+const code0 = codeOf("0");
+const code9 = codeOf("9");
 
-const codeALower = code("a");
-const codeZLower = code("z");
+const codeALower = codeOf("a");
+const codeZLower = codeOf("z");
 
-const codeAUpper = code("A");
-const codeZUpper = code("Z");
+const codeAUpper = codeOf("A");
+const codeZUpper = codeOf("Z");
 
-const codeSpace = code(" ");
-const codeUnderscore = code("_");
-const codeDot = code(".");
-const codeSlash = code("/");
-const codeStar = code("*");
+const codeSpace = codeOf(" ");
+const codeUnderscore = codeOf("_");
+const codeDot = codeOf(".");
+const codeSlash = codeOf("/");
+const codeStar = codeOf("*");
 
-const codeBackSlash = code("\\");
-const codeQuot = code('"');
-const codeNewLine = code("\n");
-const codeTab = code("\t");
-const codeReturn = code("\r");
+const codeBackSlash = codeOf("\\");
+const codeQuot = codeOf('"');
+const codeNewLine = codeOf("\n");
+const codeTab = codeOf("\t");
+const codeReturn = codeOf("\r");
 
 function isDigit(char: string, base?: number): boolean;
 function isDigit(char: number, base?: number): boolean;
 function isDigit(strNumChar: string | number, base: number = 10): boolean {
     let char: number;
     if (typeof strNumChar === "number") char = strNumChar;
-    else char = code(strNumChar);
+    else char = codeOf(strNumChar);
 
     if (base <= 10) return code0 <= char && char < code0 + base;
     else
@@ -352,7 +373,7 @@ function isAlpha(char: number): boolean;
 function isAlpha(strNumChar: string | number): boolean {
     let char: number;
     if (typeof strNumChar === "number") char = strNumChar;
-    else char = code(strNumChar);
+    else char = codeOf(strNumChar);
 
     return (
         (codeALower <= char && char <= codeZLower) ||
