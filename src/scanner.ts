@@ -168,22 +168,23 @@ export default class Scanner {
 
         readDigits(true);
 
-        let hasDot = false;
-        if (base === 10 && this.current === codeDot) {
-            hasDot = true;
-            this.advance();
-            if (isAlpha(this.current)) this.throwErrorToken("malformed number");
-            readDigits(false);
-        } else if (
-            base === 10 &&
-            (this.current === codeOf("f") || this.current === codeOf("F"))
-        ) {
-            hasDot = true;
-            this.advance();
-        }
-
-        const type =
-            base === 10 && hasDot ? TokenType.integer : TokenType.float;
+        let type = TokenType.integer;
+        if (base === 10)
+            if (this.current === codeDot) {
+                type = TokenType.float;
+                this.advance();
+                if (isAlpha(this.current))
+                    this.throwErrorToken("malformed number");
+                if (!isDigit(this.current))
+                    this.throwErrorToken("malformed number");
+                readDigits(false);
+            } else if (
+                this.current === codeOf("f") ||
+                this.current === codeOf("F")
+            ) {
+                type = TokenType.float;
+                this.advance();
+            }
 
         return this.makeToken(type);
     }
