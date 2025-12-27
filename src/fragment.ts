@@ -10,20 +10,20 @@ b & c - uint9 (first bit to encode 'register or constant')
 */
 
 export default class Fragment {
-    public readonly code: number[] = [];
-    public readonly lines: number[] = [];
-    public readonly constants: Constant[] = [];
+  public readonly code: number[] = [];
+  public readonly lines: number[] = [];
+  public readonly constants: Constant[] = [];
 
-    public writeCode(code: Code, line: number) {
-        this.code.push(code);
-        this.lines.push(line);
-    }
+  public writeCode(code: Code, line: number) {
+    this.code.push(code);
+    this.lines.push(line);
+  }
 
-    public addConstant(constant: Constant): number {
-        for (let i = 0; i < this.constants.length; i++)
-            if (this.constants[i] === constant) return i;
+  public addConstant(constant: Constant): number {
+    for (let i = 0; i < this.constants.length; i++)
+      if (this.constants[i] === constant) return i;
 
-        this.constants.push(constant);
-        return this.constants.length - 1;
-    }
+    this.constants.push(constant);
+    return this.constants.length - 1;
+  }
 }

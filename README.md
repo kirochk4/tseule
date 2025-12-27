@@ -4,13 +4,14 @@ Simple register-based interpreter for browser and node (deno & bun)
 
 ## Types
 
--   null
--   boolean
--   integer (`64bit safe overflow`)
--   float (`double`)
--   string (`char[]`)
--   table (`map<string, value | null>`)
--   function
+- null
+- boolean
+- integer (`8byte safe overflow`)
+- float (`8byte float`)
+- complex (`16byte`)
+- string (`8bit[]`)
+- table (`map<string, value | null>`)
+- function
 
 ## Example
 
